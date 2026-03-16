@@ -1,0 +1,21 @@
+# Quarto build outputs
+_site/
+.quarto/
+**/*.quarto_ipynb
+
+# Large neuroimaging data (not tracked — download separately)
+*.tck
+*.trx
+*.mif
+*.mif.gz
+*.nii.gz
+
+# Generated pipeline outputs
+*.csv
+*.tsf
+walkthrough/*_nodes.txt
+walkthrough/*_mean.txt
+tmp_*
+
+# Logs
+render.log

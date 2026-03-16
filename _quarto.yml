@@ -1,0 +1,31 @@
+project:
+  type: website
+  output-dir: _site
+
+website:
+  title: "TRX Tractography: A Better Way"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: walkthrough.qmd
+        text: Walkthrough
+  page-footer:
+    center: "Built with [Quarto](https://quarto.org)"
+
+format:
+  html:
+    theme: cosmo
+    code-tools: true
+    code-copy: true
+    toc: true
+    toc-depth: 3
+    toc-location: right
+    anchor-sections: true
+    smooth-scroll: true
+    highlight-style: monokai
+    css: styles.css
+    grid:
+      sidebar-width: 0px
+      body-width: 1050px
+      margin-width: 220px
