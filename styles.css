@@ -1,0 +1,76 @@
+/* ── Inline code (prose `backtick` spans) ────────────────────── */
+:not(pre) > code {
+  background: #2d2d2d;
+  color: #e8e8e8;
+  padding: 0.1em 0.35em;
+  border-radius: 3px;
+  font-size: 0.88em;
+}
+
+/* ── Terminal / command output blocks ─────────────────────────── */
+pre.sourceCode.bash, pre.sourceCode.sh {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  border-left: 3px solid #569cd6;
+}
+
+/* Highlight the output blocks differently from code */
+.cell-output pre {
+  background: #0d1117;
+  color: #c9d1d9;
+  border-left: 3px solid #3fb950;
+  font-size: 0.85em;
+}
+
+/* Column layout breathing room */
+.columns {
+  gap: 1.5rem;
+}
+
+/* Step headers */
+h2 {
+  border-bottom: 2px solid #dee2e6;
+  padding-bottom: 0.3em;
+  margin-top: 2.5rem;
+}
+
+/* File-inventory table */
+.file-table {
+  font-family: var(--bs-font-monospace);
+  font-size: 0.85em;
+}
+
+/* Workflow comparison badges */
+.badge-classic {
+  background: #6c757d;
+  color: white;
+  padding: 0.2em 0.6em;
+  border-radius: 4px;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+.badge-trx {
+  background: #0d6efd;
+  color: white;
+  padding: 0.2em 0.6em;
+  border-radius: 4px;
+  font-size: 0.8em;
+  font-weight: bold;
+}
+
+/* tckinfo output box */
+.tckinfo-box {
+  background: #0d1117;
+  color: #c9d1d9;
+  padding: 1rem 1.2rem;
+  border-radius: 6px;
+  border-left: 4px solid #58a6ff;
+  font-family: var(--bs-font-monospace);
+  font-size: 0.82em;
+  overflow-x: auto;
+  white-space: pre;
+}
+.tckinfo-box .highlight {
+  color: #ffa657;
+  font-weight: bold;
+}
