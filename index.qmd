@@ -5,20 +5,18 @@ subtitle: "A self-contained, reproducible tractography workflow"
 
 ## Why TRX?
 
-A typical MRtrix3 tractography pipeline for one subject produces **at least six separate files** that must travel together:
+MRtrix streamline file format (tck) is just coordinates. Additional metadata is stored in separate files. You may gather these kinds of files as you 
 
 ```
 tracks.tck              ← 5–15 GB geometry
 sift2_weights.csv       ← per-streamline weights
 assignments.txt         ← node-pair labels (tck2connectome)
-connectome.csv          ← connectivity matrix
-node_names.txt          ← atlas label list
-exemplar_bundles.zip    ← optional
+scalar_vertices.tsf     ← per-vertex data
 ```
 
-Lose or misplace one, and downstream analyses break silently — wrong weights get applied, the connectome is recomputed without normalisation, or the wrong atlas is used.
 
-**[TRX](https://github.com/tee-ar-ex/trx-spec)** (Tractography Exchange) is a container format that stores geometry, per-streamline data (dps), per-vertex data (dpv), and group memberships together in a single zip file.  This walkthrough demonstrates a complete tractography pipeline run two ways — classic TCK-based and TRX-based — on the same HCP subject, showing that the outputs are numerically identical while the TRX pipeline requires fewer files and fewer commands.
+
+**[TRX](https://github.com/tee-ar-ex/trx-spec)** is a container format that stores geometry, per-streamline data (dps), per-vertex data (dpv), and group memberships together in a single zip file.  This walkthrough demonstrates a complete tractography pipeline run two ways — classic TCK-based and TRX-based — on the same HCP subject, showing that the outputs are numerically identical while the TRX pipeline requires fewer files and fewer commands.
 
 ## What you'll see
 
