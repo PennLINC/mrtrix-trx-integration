@@ -19,3 +19,5 @@ tmp_*
 
 # Logs
 render.log
+
+/.quarto/
