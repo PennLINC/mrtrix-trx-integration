@@ -18,9 +18,10 @@ wd <- file.path(dirname(normalizePath(knitr::current_input())), "walkthrough")
 dir.create(wd, showWarnings = FALSE)
 knitr::opts_knit$set(root.dir = wd)
 
-# Prepend trx-mrtrix build binaries so bash chunks use them, not system MRtrix
+# Prepend trx-mrtrix build binaries and miniforge3 so bash chunks find them
 Sys.setenv(PATH = paste0(
   "/Users/mcieslak/projects/trx-mrtrix/build/bin",
+  ":/Users/mcieslak/miniforge3/bin",
   ":", Sys.getenv("PATH")
 ))
 
@@ -146,7 +147,7 @@ tckgen wm_fod.mif.gz       \
 ```
 
 ```{bash}
-tckinfo tracks_f16.trx
+tckinfo -prefix_depth 2 tracks_f16.trx
 du -sh  tracks_f16.trx
 ```
 :::
@@ -167,7 +168,7 @@ tckconvert tracks.tck tracks.trx -force
 ```
 
 ```{bash}
-tckinfo tracks.trx
+tckinfo -prefix_depth 2 tracks.trx
 du -sh  tracks.trx
 ```
 
@@ -217,7 +218,7 @@ tcksift2               \
 ```
 
 ```{bash}
-tckinfo tracks.trx
+tckinfo -prefix_depth 2 tracks.trx
 ```
 :::
 
@@ -279,23 +280,118 @@ tcksample tracks.trx icvf.nii.gz icvf_mean -stat_tck mean
 mtime "tcksample isovf mean" \
 tcksample tracks.trx isovf.nii.gz isovf_mean -stat_tck mean
 
-tckinfo tracks.trx
+tckinfo -prefix_depth 2 tracks.trx
 ```
 :::
 
 ::::
 
-::: {.callout-note}
-## Viewing NODDI scalars in mrview
+---
+
+## Step 4 — Visualize results in mrview
+
+`mrview` loads TRX files directly.  The SIFT2 weights and NODDI scalars embedded
+in the previous two steps are immediately available as colormap sources — no
+sidecar files to locate or load separately.
 
 Open `tracks.trx` in `mrview → Tools → Tractography → Colour → Scalar file → TRX field…`
-and select `icvf` or `isovf` for per-vertex coloring along each streamline.
-No `.tsf` file needs to be loaded separately.
-:::
+and select `icvf`, `isovf`, or `weights` for per-vertex or per-streamline coloring.
+If a field name exists in both dps and dpv, disambiguate using `dps:<name>` or `dpv:<name>`.
+
+Command-line capture via `-capture.folder`, `-capture.prefix`, and `-capture.grab`
+works with TRX inputs (requires a live GUI session):
+
+```{bash}
+#| eval: false
+mrview mask.nii.gz \
+  -mode 2 \
+  -imagevisible 0 \
+  -tractography.load tracks.trx \
+  -tractography.geometry lines \
+  -tractography.opacity 1.0 \
+  -tractography.thickness 0.25 \
+  -tractography.slab -1 \
+  -tractography.trx_scalar dps:weights \
+  -tractography.tsf_range 0.15,2.5 \
+  -capture.folder . \
+  -capture.prefix trx_sift_overlay \
+  -capture.grab \
+  -exit
+```
+
+```{bash}
+#| label: mrview-capture-and-embed
+#| results: asis
+source ../timing_utils.sh
+rm -f trx_sift_overlay*.png mrview_trx_overlay.png mrview_trx_overlay_fallback.svg
+rm -f ../mrview_trx_overlay.png ../mrview_trx_overlay_fallback.svg
+
+set +e
+mrview mask.nii.gz \
+  -mode 2 \
+  -imagevisible 0 \
+  -tractography.load tracks.trx \
+  -tractography.geometry lines \
+  -tractography.opacity 1.0 \
+  -tractography.thickness 0.25 \
+  -tractography.slab -1 \
+  -tractography.trx_scalar dps:weights \
+  -tractography.tsf_range 0.15,2.5 \
+  -capture.folder . \
+  -capture.prefix trx_sift_overlay \
+  -capture.grab \
+  -exit
+mrview_status=$?
+set -e
+
+capture_file=""
+for f in trx_sift_overlay*.png; do
+  if [ -f "$f" ]; then
+    capture_file="$f"
+    break
+  fi
+done
+
+if [ -n "$capture_file" ]; then
+  cp "$capture_file" mrview_trx_overlay.png
+  cp "$capture_file" ../mrview_trx_overlay.png
+  echo "Captured mrview image: \`$capture_file\`"
+  echo ""
+  echo "![TRX streamlines coloured by embedded SIFT2 weights](mrview_trx_overlay.png)"
+else
+  python3 - <<'EOF'
+from pathlib import Path
+Path("mrview_trx_overlay_fallback.svg").write_text(
+    """<svg xmlns='http://www.w3.org/2000/svg' width='1100' height='360' viewBox='0 0 1100 360'>
+<defs>
+  <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+    <stop offset='0%' stop-color='#20293a'/>
+    <stop offset='100%' stop-color='#102018'/>
+  </linearGradient>
+</defs>
+<rect width='1100' height='360' fill='url(#g)'/>
+<text x='48' y='120' fill='#f4f6fa' font-family='Helvetica, Arial, sans-serif' font-size='36' font-weight='700'>
+mrview capture unavailable during render
+</text>
+<text x='48' y='172' fill='#d9deea' font-family='Helvetica, Arial, sans-serif' font-size='24'>
+This environment could not open a GUI session (exit code: %d).
+</text>
+<text x='48' y='220' fill='#c5cedf' font-family='Helvetica, Arial, sans-serif' font-size='22'>
+Run this walkthrough locally in a desktop session to capture the real overlay image.
+</text>
+</svg>"""
+)
+EOF
+  cp mrview_trx_overlay_fallback.svg ../mrview_trx_overlay_fallback.svg
+  echo "mrview capture failed (exit code: $mrview_status); embedded fallback panel instead."
+  echo ""
+  echo "![mrview capture fallback panel](mrview_trx_overlay_fallback.svg)"
+fi
+```
 
 ---
 
-## Step 4 — Atlas labeling and connectome construction
+## Step 5 — Atlas labeling and connectome construction
 
 `tck2connectome` assigns streamlines to node pairs on-the-fly — the assignment
 is ephemeral and must be recomputed for every new atlas or metric.
@@ -362,7 +458,7 @@ trxlabel                         \
 
 ```{bash}
 #| label: tckinfo-after-label
-tckinfo tracks.trx
+tckinfo -prefix_depth 2 tracks.trx
 ```
 
 ```{bash}
@@ -397,12 +493,68 @@ trx2connectome                 \
 
 ```{bash}
 #| label: tckinfo-final
-tckinfo tracks.trx
+tckinfo -prefix_depth 2 tracks.trx
+```
+
+### 4c — TRX combined-atlas connectome in one matrix
+
+Because both atlas group sets are embedded in one TRX file, `trx2connectome`
+can emit a single matrix that includes:
+
+- within-atlas edges (Glasser-Glasser, 4S456-4S456), and
+- cross-atlas edges (Glasser-4S456),
+
+without rerunning any node assignment.
+
+```{bash}
+#| label: trx2connectome-combined
+source ../timing_utils.sh
+mtime "trx2connectome combined-atlas matrix" \
+trx2connectome \
+    tracks.trx \
+    connectome_combined_trx.csv \
+    -tck_weights_in weights \
+    -out_node_names combined_nodes.txt \
+    -symmetric \
+    -zero_diagonal \
+    -force
+```
+
+```{bash}
+#| label: combined-connectome-summary
+python3 - <<'EOF'
+import collections
+import itertools
+import numpy as np
+
+mat = np.loadtxt("connectome_combined_trx.csv", delimiter=",")
+names = [line.strip() for line in open("combined_nodes.txt") if line.strip()]
+
+def atlas_prefix(name: str) -> str:
+    return name.split("_", 1)[0] if "_" in name else "(no_prefix)"
+
+if mat.shape[0] != len(names):
+    raise RuntimeError(f"matrix shape {mat.shape} does not match node-name list length {len(names)}")
+
+prefix_counts = collections.Counter(atlas_prefix(n) for n in names)
+print(f"combined matrix shape: {mat.shape}")
+print("node counts by atlas prefix:")
+for k in sorted(prefix_counts):
+    print(f"  {k}: {prefix_counts[k]}")
+
+indices = {k: [i for i, n in enumerate(names) if atlas_prefix(n) == k] for k in sorted(prefix_counts)}
+print("non-zero edge counts by atlas block:")
+for a, b in itertools.combinations_with_replacement(sorted(indices), 2):
+    block = mat[np.ix_(indices[a], indices[b])]
+    nnz = int((block > 0).sum())
+    total = float(block.sum())
+    print(f"  {a:>8s} x {b:<8s}: nnz={nnz:6d}, sum={total:.3f}")
+EOF
 ```
 
 ---
 
-## Step 5 — Verify equivalence
+## Step 6 — Verify equivalence
 
 `tck2connectome` orders its matrix by numeric node ID (1, 2, 3 …), while
 `trx2connectome` orders alphabetically by group name.  Before comparing, we
@@ -510,7 +662,7 @@ EOF
 
 ---
 
-## Step 6 — File inventory
+## Step 7 — File inventory
 
 ```{bash}
 #| label: file-inventory
@@ -521,6 +673,126 @@ ls -lh tracks.tck weights_classic.csv icvf.tsf isovf.tsf icvf_mean.txt isovf_mea
 echo ""
 echo "=== TRX: everything in one file ==="
 ls -lh tracks.trx connectome_glasser_trx.csv connectome_4S456_trx.csv
+```
+
+---
+
+## Step 8 — TRX-native edge extraction (`connectome2tck` without assignments file)
+
+The TRX pathway can derive per-streamline node assignments directly from embedded
+groups, so no separate assignments file is required.
+
+```{bash}
+#| label: connectome2tck-trx-derived
+source ../timing_utils.sh
+mtime "connectome2tck TRX-derived assignments" \
+connectome2tck \
+    tracks.trx \
+    - \
+    edge_glasser_ \
+    -group_prefix glasser \
+    -nodes 1,2 \
+    -exclusive \
+    -files single \
+    -force
+```
+
+```{bash}
+#| label: connectome2tck-classic-reference
+source ../timing_utils.sh
+mtime "tck2connectome assignments export (classic)" \
+tck2connectome \
+    tracks.tck \
+    glasser.mif.gz \
+    throwaway_connectome.csv \
+    -tck_weights_in weights_classic.csv \
+    -out_assignments assignments_glasser_classic.txt \
+    -assignment_radial_search 2 \
+    -force
+
+mtime "connectome2tck classic reference" \
+connectome2tck \
+    tracks.tck \
+    assignments_glasser_classic.txt \
+    edge_classic_ \
+    -nodes 1,2 \
+    -exclusive \
+    -files single \
+    -force
+```
+
+```{bash}
+#| label: connectome2tck-geometry-diff
+python3 - <<'EOF'
+import subprocess
+
+def tck_count(path: str) -> int:
+    out = subprocess.check_output(["tckstats", path, "-output", "count"], text=True).strip()
+    return int(float(out))
+
+def tck_mean_len(path: str) -> float:
+    out = subprocess.check_output(["tckstats", path, "-output", "mean"], text=True).strip()
+    return float(out)
+
+a = "edge_glasser_.tck"
+b = "edge_classic_.tck"
+ca, cb = tck_count(a), tck_count(b)
+ma, mb = tck_mean_len(a), tck_mean_len(b)
+
+print(f"{a}: count={ca}, mean_len={ma:.4f}")
+print(f"{b}: count={cb}, mean_len={mb:.4f}")
+print(f"delta: count={ca-cb}, mean_len={ma-mb:.6f}")
+EOF
+```
+
+---
+
+## Step 9 — Embedded-field workflows (`tckmap` and `fixel2tsf`)
+
+These are practical high-impact wins from TRX integration: downstream commands
+can consume or produce embedded fields without sidecar files.
+
+```{bash}
+#| label: tckmap-embedded-weights
+source ../timing_utils.sh
+mtime "tckmap weighted from embedded dps" \
+tckmap \
+    tracks.trx \
+    tdi_weighted_trx.mif.gz \
+    -template mask.nii.gz \
+    -tck_weights_in weights \
+    -contrast tdi \
+    -force
+```
+
+```{bash}
+#| label: fixel2tsf-embed-dpv
+source ../timing_utils.sh
+if [ -f fd.mif.gz ]; then
+  mtime "fixel2tsf embed dpv in TRX" \
+  fixel2tsf \
+      fd.mif.gz \
+      tracks.trx \
+      fd_along_track \
+      -force
+else
+  echo "Skipping fixel2tsf demo: fd.mif.gz not found in walkthrough data directory"
+fi
+
+tckinfo -prefix_depth 2 tracks.trx
+```
+
+```{bash}
+#| label: embedded-fields-summary
+python3 - <<'EOF'
+import re, subprocess
+out = subprocess.check_output(["tckinfo", "-prefix_depth", "2", "tracks.trx"], text=True)
+keys = ["Data per streamline", "Data per vertex", "Groups ("]
+for k in keys:
+    m = re.search(rf"^{re.escape(k)}.*$", out, flags=re.MULTILINE)
+    if m:
+        print(m.group(0))
+EOF
 ```
 
 ---
@@ -538,3 +810,4 @@ ls -lh tracks.trx connectome_glasser_trx.csv connectome_4S456_trx.csv
 | `tsfinfo` / `tsfvalidate` | Inspect and validate TRX dpv fields |
 | `mrview` | Loads TRX directly; colour by group, dps, or dpv field from the GUI |
 :::
+
