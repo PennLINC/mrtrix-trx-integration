@@ -1,23 +1,41 @@
-/* ── Inline code (prose `backtick` spans) ────────────────────── */
+/* ── Code / monospace contrast normalization ──────────────────── */
+:root {
+  --code-bg-inline: #2d2d2d;
+  --code-fg-inline: #e8e8e8;
+  --code-bg-block: #1e1e1e;
+  --code-fg-block: #d4d4d4;
+  --code-bg-output: #0d1117;
+  --code-fg-output: #c9d1d9;
+}
+
+/* Inline code in prose */
 :not(pre) > code {
-  background: #2d2d2d;
-  color: #e8e8e8;
+  background: var(--code-bg-inline);
+  color: var(--code-fg-inline);
   padding: 0.1em 0.35em;
   border-radius: 3px;
   font-size: 0.88em;
 }
 
-/* ── Terminal / command output blocks ─────────────────────────── */
-pre.sourceCode.bash, pre.sourceCode.sh {
-  background: #1e1e1e;
-  color: #d4d4d4;
+/* All fixed-width code blocks (not just bash/sh) */
+pre,
+div.sourceCode pre,
+pre.sourceCode {
+  background: var(--code-bg-block);
+  color: var(--code-fg-block);
   border-left: 3px solid #569cd6;
 }
 
-/* Highlight the output blocks differently from code */
+/* Ensure nested <code> inherits readable colors */
+pre code {
+  color: inherit;
+  background: transparent;
+}
+
+/* Distinct style for command output blocks */
 .cell-output pre {
-  background: #0d1117;
-  color: #c9d1d9;
+  background: var(--code-bg-output);
+  color: var(--code-fg-output);
   border-left: 3px solid #3fb950;
   font-size: 0.85em;
 }
