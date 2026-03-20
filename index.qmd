@@ -1,14 +1,14 @@
 ---
-title: "TRX Tractography in MRtrix3"
+title: "TRX in MRtrix3"
 subtitle: "A typical workflow"
 ---
 
 ## Why TRX?
 
-MRtrix streamline file format (tck) is just coordinates. Additional metadata is stored in separate files. You may gather these kinds of files as you map data to streamlines (tsf or sift weights) or streamlines to data (tck2connectome). **[TRX](https://github.com/tee-ar-ex/trx-spec)** is a container format that stores geometry, per-streamline data (dps), per-vertex data (dpv), and group memberships together in a single zip file.
+MRtrix streamline file format (tck) contains float32 coordinates and some header information. Additional metadata is stored in separate files. These sidecar files are produced as you map data to streamlines (tsf or sift weights) or streamlines to data (tck2connectome). **[TRX](https://github.com/tee-ar-ex/trx-spec)** is a container format that stores geometry, per-streamline data (dps), per-vertex data (dpv), and group memberships together in a single zip file.
 
 This walkthrough demonstrates a complete tractography pipeline run two ways — classic TCK-based and TRX-based — on the same HCP subject, showing that the outputs are numerically identical.
-The design leaves the TCK-using commands and outputs _completely unchanged_, demonstrating that TRX integration will not
+The design leaves the TCK-using commands and outputs _mostly unchanged_, demonstrating that TRX integration will not
 disrupt existing workflows. The changes to MRtrix3 code source are as small as possible.
 
 It also highlights that the TRX format reduces the number of files produced by the workflow.
@@ -37,7 +37,7 @@ The TRX file grows as each step adds metadata; `tckinfo` at each stage reveals i
 
 ## Data
 
-Subject **sub-100307** from the HCP Young Adult dataset, processed through
+A scan from the HCP Young Adult dataset, processed through
 [QSIRecon](https://qsirecon.readthedocs.io)'s `mrtrix_multishell_msmt_hsvs` pipeline.
 Starting inputs:
 

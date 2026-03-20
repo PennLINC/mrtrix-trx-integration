@@ -1,6 +1,6 @@
 ---
 title: "Classic vs TRX: A Complete Tractography Walkthrough"
-subtitle: "HCP sub-100307 · Glasser 360 + Schaefer 4S456 · NODDI scalars · 50k streamlines"
+subtitle: "HCP Data · Glasser 360 + Schaefer 4S456 · NODDI scalars · 500k streamlines"
 execute:
   echo: true
   eval: true
@@ -26,7 +26,7 @@ Sys.setenv(PATH = paste0(
 ))
 
 # Number of streamlines — small for a fast demo render; scale up for production
-Sys.setenv(N_TRACKS = "50000")
+Sys.setenv(N_TRACKS = "1000000")
 ```
 
 ::: {.callout-note}
@@ -34,8 +34,8 @@ Sys.setenv(N_TRACKS = "50000")
 
 This document executes during render (`eval: true`).  All MRtrix binaries come
 from the `trx-mrtrix` build at `build/bin/`, not the system installation.
-The demo uses **50 000 streamlines** for a ~15-minute render; change `N_TRACKS`
-in the R setup chunk for production use.
+The demo uses **1M streamlines** for a long render; change `N_TRACKS`
+in the R setup chunk to make it faster/slower.
 :::
 
 ## Timing and resource measurement
@@ -147,7 +147,7 @@ tckgen wm_fod.mif.gz       \
 ```
 
 ```{bash}
-tckinfo -prefix_depth 2 tracks_f16.trx
+tckinfo tracks_f16.trx
 du -sh  tracks_f16.trx
 ```
 :::
@@ -168,7 +168,7 @@ tckconvert tracks.tck tracks.trx -force
 ```
 
 ```{bash}
-tckinfo -prefix_depth 2 tracks.trx
+tckinfo tracks.trx
 du -sh  tracks.trx
 ```
 
@@ -214,11 +214,12 @@ tcksift2               \
     tracks.trx         \
     wm_fod.mif.gz      \
     weights            \
-    -nthreads 8
+    -nthreads 8        \
+    -force
 ```
 
 ```{bash}
-tckinfo -prefix_depth 2 tracks.trx
+tckinfo tracks.trx
 ```
 :::
 
@@ -302,7 +303,6 @@ Command-line capture via `-capture.folder`, `-capture.prefix`, and `-capture.gra
 works with TRX inputs (requires a live GUI session):
 
 ```{bash}
-#| eval: false
 mrview mask.nii.gz \
   -mode 2 \
   -imagevisible 0 \
@@ -358,34 +358,6 @@ if [ -n "$capture_file" ]; then
   echo "Captured mrview image: \`$capture_file\`"
   echo ""
   echo "![TRX streamlines coloured by embedded SIFT2 weights](mrview_trx_overlay.png)"
-else
-  python3 - <<'EOF'
-from pathlib import Path
-Path("mrview_trx_overlay_fallback.svg").write_text(
-    """<svg xmlns='http://www.w3.org/2000/svg' width='1100' height='360' viewBox='0 0 1100 360'>
-<defs>
-  <linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
-    <stop offset='0%' stop-color='#20293a'/>
-    <stop offset='100%' stop-color='#102018'/>
-  </linearGradient>
-</defs>
-<rect width='1100' height='360' fill='url(#g)'/>
-<text x='48' y='120' fill='#f4f6fa' font-family='Helvetica, Arial, sans-serif' font-size='36' font-weight='700'>
-mrview capture unavailable during render
-</text>
-<text x='48' y='172' fill='#d9deea' font-family='Helvetica, Arial, sans-serif' font-size='24'>
-This environment could not open a GUI session (exit code: %d).
-</text>
-<text x='48' y='220' fill='#c5cedf' font-family='Helvetica, Arial, sans-serif' font-size='22'>
-Run this walkthrough locally in a desktop session to capture the real overlay image.
-</text>
-</svg>"""
-)
-EOF
-  cp mrview_trx_overlay_fallback.svg ../mrview_trx_overlay_fallback.svg
-  echo "mrview capture failed (exit code: $mrview_status); embedded fallback panel instead."
-  echo ""
-  echo "![mrview capture fallback panel](mrview_trx_overlay_fallback.svg)"
 fi
 ```
 
@@ -471,6 +443,7 @@ trx2connectome                   \
     -tck_weights_in weights      \
     -out_node_names glasser_nodes.txt \
     -group_prefix glasser        \
+    -lut glasser.txt             \
     -symmetric                   \
     -zero_diagonal               \
     -force
@@ -486,6 +459,7 @@ trx2connectome                 \
     -tck_weights_in weights    \
     -out_node_names 4S456_nodes.txt \
     -group_prefix 4S456        \
+    -lut 4S456.txt             \
     -symmetric                 \
     -zero_diagonal             \
     -force
@@ -556,53 +530,33 @@ EOF
 
 ## Step 6 — Verify equivalence
 
-`tck2connectome` orders its matrix by numeric node ID (1, 2, 3 …), while
-`trx2connectome` orders alphabetically by group name.  Before comparing, we
-reorder the TRX matrix into node-ID order using the same LUT.
+With `-lut`, `trx2connectome` orders rows and columns by numeric node ID —
+the same ordering `tck2connectome` uses.  The matrices are directly comparable
+with no reordering.
 
 ```{bash}
 #| label: diff-connectomes
 python3 - <<'EOF'
-import numpy as np
-
-def load_lut(path):
-    """Return {name: 0-based row index} ordered by node ID."""
-    entries = []
-    with open(path) as f:
-        for line in f:
-            parts = line.strip().split()
-            if len(parts) >= 2:
-                entries.append((int(parts[0]), parts[1]))
-    entries.sort()
-    return {name: i for i, (_, name) in enumerate(entries)}
-
-def reorder_trx(trx_mat, trx_names, lut):
-    """Permute TRX rows/cols from alphabetical to node-ID order."""
-    # perm[i] = classic row for TRX row i
-    perm = np.array([lut[n] for n in trx_names])
-    inv  = np.empty(len(perm), dtype=int)
-    inv[perm] = np.arange(len(perm))
-    return trx_mat[np.ix_(inv, inv)]
-
-atlases = [
-    ("Glasser", "connectome_glasser_classic.csv", "connectome_glasser_trx.csv",
-     "glasser_nodes.txt", "glasser.txt"),
-    ("4S456",   "connectome_4S456_classic.csv",   "connectome_4S456_trx.csv",
-     "4S456_nodes.txt",   "4S456.txt"),
-]
-
-for name, classic_f, trx_f, names_f, lut_f in atlases:
-    classic    = np.loadtxt(classic_f, delimiter=",")
-    trx        = np.loadtxt(trx_f,     delimiter=",")
-    trx_names  = open(names_f).read().splitlines()
-    lut        = load_lut(lut_f)
-    trx_sorted = reorder_trx(trx, trx_names, lut)
-    diff       = np.abs(classic - trx_sorted)
-    print(f"\n── {name} {classic.shape} ──────────────────────")
-    print(f"  Max |diff|:         {diff.max():.3e}")
-    print(f"  Mean |diff|:        {diff.mean():.3e}")
-    print(f"  Non-zero classic:   {(classic > 0).sum()}")
-    print(f"  Non-zero TRX:       {(trx > 0).sum()}")
+import numpy as np, sys
+ok = True
+for atlas in [("Glasser", "connectome_glasser_classic.csv", "connectome_glasser_trx.csv"),
+              ("4S456",   "connectome_4S456_classic.csv",   "connectome_4S456_trx.csv")]:
+    name, cf, tf = atlas
+    a = np.loadtxt(cf, delimiter=",")
+    b = np.loadtxt(tf, delimiter=",")
+    if a.shape != b.shape:
+        print(f"{name}: SHAPE MISMATCH  classic={a.shape}  trx={b.shape}", file=sys.stderr)
+        ok = False
+        continue
+    diff = np.abs(a - b)
+    print(f"{name} {a.shape}  max|diff|={diff.max():.2e}  mean|diff|={diff.mean():.2e}")
+    if diff.max() > 0.5:
+        ok = False
+        print(f"  FAIL: differences too large", file=sys.stderr)
+if ok:
+    print("All matrices match (within rounding).")
+else:
+    sys.exit(1)
 EOF
 ```
 
@@ -614,37 +568,16 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-def load_lut(path):
-    entries = []
-    with open(path) as f:
-        for line in f:
-            parts = line.strip().split()
-            if len(parts) >= 2:
-                entries.append((int(parts[0]), parts[1]))
-    entries.sort()
-    return {name: i for i, (_, name) in enumerate(entries)}
-
-def reorder_trx(trx_mat, trx_names, lut):
-    perm = np.array([lut[n] for n in trx_names])
-    inv  = np.empty(len(perm), dtype=int)
-    inv[perm] = np.arange(len(perm))
-    return trx_mat[np.ix_(inv, inv)]
-
 pairs = [
-    ("Glasser 360",    "connectome_glasser_classic.csv", "connectome_glasser_trx.csv",
-     "glasser_nodes.txt", "glasser.txt"),
-    ("Schaefer 4S456", "connectome_4S456_classic.csv",   "connectome_4S456_trx.csv",
-     "4S456_nodes.txt",   "4S456.txt"),
+    ("Glasser 360",    "connectome_glasser_classic.csv", "connectome_glasser_trx.csv"),
+    ("Schaefer 4S456", "connectome_4S456_classic.csv",   "connectome_4S456_trx.csv"),
 ]
 
 fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-for row, (name, cf, tf, names_f, lut_f) in enumerate(pairs):
-    classic    = np.loadtxt(cf, delimiter=",")
-    trx        = np.loadtxt(tf, delimiter=",")
-    trx_names  = open(names_f).read().splitlines()
-    lut        = load_lut(lut_f)
-    trx_sorted = reorder_trx(trx, trx_names, lut)
-    for col, (mat, title) in enumerate([(classic, f"{name}\nClassic"), (trx_sorted, f"{name}\nTRX")]):
+for row, (name, cf, tf) in enumerate(pairs):
+    classic = np.loadtxt(cf, delimiter=",")
+    trx     = np.loadtxt(tf, delimiter=",")
+    for col, (mat, title) in enumerate([(classic, f"{name}\nClassic"), (trx, f"{name}\nTRX")]):
         ax = axes[row][col]
         im = ax.imshow(np.log1p(mat), cmap="inferno", aspect="auto")
         ax.set_title(title)
@@ -673,126 +606,6 @@ ls -lh tracks.tck weights_classic.csv icvf.tsf isovf.tsf icvf_mean.txt isovf_mea
 echo ""
 echo "=== TRX: everything in one file ==="
 ls -lh tracks.trx connectome_glasser_trx.csv connectome_4S456_trx.csv
-```
-
----
-
-## Step 8 — TRX-native edge extraction (`connectome2tck` without assignments file)
-
-The TRX pathway can derive per-streamline node assignments directly from embedded
-groups, so no separate assignments file is required.
-
-```{bash}
-#| label: connectome2tck-trx-derived
-source ../timing_utils.sh
-mtime "connectome2tck TRX-derived assignments" \
-connectome2tck \
-    tracks.trx \
-    - \
-    edge_glasser_ \
-    -group_prefix glasser \
-    -nodes 1,2 \
-    -exclusive \
-    -files single \
-    -force
-```
-
-```{bash}
-#| label: connectome2tck-classic-reference
-source ../timing_utils.sh
-mtime "tck2connectome assignments export (classic)" \
-tck2connectome \
-    tracks.tck \
-    glasser.mif.gz \
-    throwaway_connectome.csv \
-    -tck_weights_in weights_classic.csv \
-    -out_assignments assignments_glasser_classic.txt \
-    -assignment_radial_search 2 \
-    -force
-
-mtime "connectome2tck classic reference" \
-connectome2tck \
-    tracks.tck \
-    assignments_glasser_classic.txt \
-    edge_classic_ \
-    -nodes 1,2 \
-    -exclusive \
-    -files single \
-    -force
-```
-
-```{bash}
-#| label: connectome2tck-geometry-diff
-python3 - <<'EOF'
-import subprocess
-
-def tck_count(path: str) -> int:
-    out = subprocess.check_output(["tckstats", path, "-output", "count"], text=True).strip()
-    return int(float(out))
-
-def tck_mean_len(path: str) -> float:
-    out = subprocess.check_output(["tckstats", path, "-output", "mean"], text=True).strip()
-    return float(out)
-
-a = "edge_glasser_.tck"
-b = "edge_classic_.tck"
-ca, cb = tck_count(a), tck_count(b)
-ma, mb = tck_mean_len(a), tck_mean_len(b)
-
-print(f"{a}: count={ca}, mean_len={ma:.4f}")
-print(f"{b}: count={cb}, mean_len={mb:.4f}")
-print(f"delta: count={ca-cb}, mean_len={ma-mb:.6f}")
-EOF
-```
-
----
-
-## Step 9 — Embedded-field workflows (`tckmap` and `fixel2tsf`)
-
-These are practical high-impact wins from TRX integration: downstream commands
-can consume or produce embedded fields without sidecar files.
-
-```{bash}
-#| label: tckmap-embedded-weights
-source ../timing_utils.sh
-mtime "tckmap weighted from embedded dps" \
-tckmap \
-    tracks.trx \
-    tdi_weighted_trx.mif.gz \
-    -template mask.nii.gz \
-    -tck_weights_in weights \
-    -contrast tdi \
-    -force
-```
-
-```{bash}
-#| label: fixel2tsf-embed-dpv
-source ../timing_utils.sh
-if [ -f fd.mif.gz ]; then
-  mtime "fixel2tsf embed dpv in TRX" \
-  fixel2tsf \
-      fd.mif.gz \
-      tracks.trx \
-      fd_along_track \
-      -force
-else
-  echo "Skipping fixel2tsf demo: fd.mif.gz not found in walkthrough data directory"
-fi
-
-tckinfo -prefix_depth 2 tracks.trx
-```
-
-```{bash}
-#| label: embedded-fields-summary
-python3 - <<'EOF'
-import re, subprocess
-out = subprocess.check_output(["tckinfo", "-prefix_depth", "2", "tracks.trx"], text=True)
-keys = ["Data per streamline", "Data per vertex", "Groups ("]
-for k in keys:
-    m = re.search(rf"^{re.escape(k)}.*$", out, flags=re.MULTILINE)
-    if m:
-        print(m.group(0))
-EOF
 ```
 
 ---
