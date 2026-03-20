@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
 
 
-<title>TRX Tractography in MRtrix3 – TRX support in MRtrix3</title>
+<title>TRX in MRtrix3 – TRX support in MRtrix3</title>
 <style>
 code{white-space: pre-wrap;}
 span.smallcaps{font-variant: small-caps;}
@@ -161,7 +161,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <header id="title-block-header" class="quarto-title-block default">
 <div class="quarto-title">
-<div class="quarto-title-block"><div><h1 class="title">TRX Tractography in MRtrix3</h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
+<div class="quarto-title-block"><div><h1 class="title">TRX in MRtrix3</h1><button type="button" class="btn code-tools-button" id="quarto-code-tools-source"><i class="bi"></i> Code</button></div></div>
 <p class="subtitle lead">A typical workflow</p>
 </div>
 
@@ -181,8 +181,8 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 
 <section id="why-trx" class="level2">
 <h2 class="anchored" data-anchor-id="why-trx">Why TRX?</h2>
-<p>MRtrix streamline file format (tck) is just coordinates. Additional metadata is stored in separate files. You may gather these kinds of files as you map data to streamlines (tsf or sift weights) or streamlines to data (tck2connectome). <strong><a href="https://github.com/tee-ar-ex/trx-spec">TRX</a></strong> is a container format that stores geometry, per-streamline data (dps), per-vertex data (dpv), and group memberships together in a single zip file.</p>
-<p>This walkthrough demonstrates a complete tractography pipeline run two ways — classic TCK-based and TRX-based — on the same HCP subject, showing that the outputs are numerically identical. The design leaves the TCK-using commands and outputs <em>completely unchanged</em>, demonstrating that TRX integration will not disrupt existing workflows. The changes to MRtrix3 code source are as small as possible.</p>
+<p>MRtrix streamline file format (tck) contains float32 coordinates and some header information. Additional metadata is stored in separate files. These sidecar files are produced as you map data to streamlines (tsf or sift weights) or streamlines to data (tck2connectome). <strong><a href="https://github.com/tee-ar-ex/trx-spec">TRX</a></strong> is a container format that stores geometry, per-streamline data (dps), per-vertex data (dpv), and group memberships together in a single zip file.</p>
+<p>This walkthrough demonstrates a complete tractography pipeline run two ways — classic TCK-based and TRX-based — on the same HCP subject, showing that the outputs are numerically identical. The design leaves the TCK-using commands and outputs <em>mostly unchanged</em>, demonstrating that TRX integration will not disrupt existing workflows. The changes to MRtrix3 code source are as small as possible.</p>
 <p>It also highlights that the TRX format reduces the number of files produced by the workflow. Using TCK format, we would produce the following files:</p>
 <pre><code>tracks.tck              ← 5–15 GB geometry
 sift2_weights.csv       ← per-streamline weights
@@ -237,7 +237,7 @@ scalar_vertices.tsf     ← per-vertex data</code></pre>
 </section>
 <section id="data" class="level2">
 <h2 class="anchored" data-anchor-id="data">Data</h2>
-<p>Subject <strong>sub-100307</strong> from the HCP Young Adult dataset, processed through <a href="https://qsirecon.readthedocs.io">QSIRecon</a>’s <code>mrtrix_multishell_msmt_hsvs</code> pipeline. Starting inputs:</p>
+<p>A scan from the HCP Young Adult dataset, processed through <a href="https://qsirecon.readthedocs.io">QSIRecon</a>’s <code>mrtrix_multishell_msmt_hsvs</code> pipeline. Starting inputs:</p>
 <ul>
 <li>WM FOD (msmt-CSD, max SH order 8)</li>
 <li>Brain mask (mtnormalize inlier mask)</li>
@@ -703,16 +703,16 @@ scalar_vertices.tsf     ← per-vertex data</code></pre>
   });
   </script><div class="modal fade" id="quarto-embedded-source-code-modal" tabindex="-1" aria-labelledby="quarto-embedded-source-code-modal-label" aria-hidden="true"><div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="quarto-embedded-source-code-modal-label">Source Code</h5><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="">
 <div class="code-copy-outer-scaffold"><div class="sourceCode" id="cb2" data-shortcodes="false"><pre class="sourceCode markdown code-with-copy"><code class="sourceCode markdown"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "TRX Tractography in MRtrix3"</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a><span class="an">title:</span><span class="co"> "TRX in MRtrix3"</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a><span class="an">subtitle:</span><span class="co"> "A typical workflow"</span></span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a><span class="co">---</span></span>
 <span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a><span class="fu">## Why TRX?</span></span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>MRtrix streamline file format (tck) is just coordinates. Additional metadata is stored in separate files. You may gather these kinds of files as you map data to streamlines (tsf or sift weights) or streamlines to data (tck2connectome). **[TRX](https://github.com/tee-ar-ex/trx-spec)** is a container format that stores geometry, per-streamline data (dps), per-vertex data (dpv), and group memberships together in a single zip file.</span>
+<span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>MRtrix streamline file format (tck) contains float32 coordinates and some header information. Additional metadata is stored in separate files. These sidecar files are produced as you map data to streamlines (tsf or sift weights) or streamlines to data (tck2connectome). **[TRX](https://github.com/tee-ar-ex/trx-spec)** is a container format that stores geometry, per-streamline data (dps), per-vertex data (dpv), and group memberships together in a single zip file.</span>
 <span id="cb2-9"><a href="#cb2-9" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-10"><a href="#cb2-10" aria-hidden="true" tabindex="-1"></a>This walkthrough demonstrates a complete tractography pipeline run two ways — classic TCK-based and TRX-based — on the same HCP subject, showing that the outputs are numerically identical.</span>
-<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>The design leaves the TCK-using commands and outputs _completely unchanged_, demonstrating that TRX integration will not</span>
+<span id="cb2-11"><a href="#cb2-11" aria-hidden="true" tabindex="-1"></a>The design leaves the TCK-using commands and outputs _mostly unchanged_, demonstrating that TRX integration will not</span>
 <span id="cb2-12"><a href="#cb2-12" aria-hidden="true" tabindex="-1"></a>disrupt existing workflows. The changes to MRtrix3 code source are as small as possible.</span>
 <span id="cb2-13"><a href="#cb2-13" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>It also highlights that the TRX format reduces the number of files produced by the workflow.</span>
@@ -741,7 +741,7 @@ scalar_vertices.tsf     ← per-vertex data</code></pre>
 <span id="cb2-37"><a href="#cb2-37" aria-hidden="true" tabindex="-1"></a></span>
 <span id="cb2-38"><a href="#cb2-38" aria-hidden="true" tabindex="-1"></a><span class="fu">## Data</span></span>
 <span id="cb2-39"><a href="#cb2-39" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>Subject **sub-100307** from the HCP Young Adult dataset, processed through</span>
+<span id="cb2-40"><a href="#cb2-40" aria-hidden="true" tabindex="-1"></a>A scan from the HCP Young Adult dataset, processed through</span>
 <span id="cb2-41"><a href="#cb2-41" aria-hidden="true" tabindex="-1"></a><span class="co">[</span><span class="ot">QSIRecon</span><span class="co">](https://qsirecon.readthedocs.io)</span>'s <span class="in">`mrtrix_multishell_msmt_hsvs`</span> pipeline.</span>
 <span id="cb2-42"><a href="#cb2-42" aria-hidden="true" tabindex="-1"></a>Starting inputs:</span>
 <span id="cb2-43"><a href="#cb2-43" aria-hidden="true" tabindex="-1"></a></span>
